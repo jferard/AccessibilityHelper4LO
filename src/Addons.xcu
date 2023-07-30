@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<oor:component-data
+        xmlns:oor="http://openoffice.org/2001/registry"
+        xmlns:xs="http://www.w3.org/2001/XMLSchema"
+        oor:name="Addons" oor:package="org.openoffice.Office">
+    <node oor:name="AddonUI">
+        <node oor:name="AddonMenu">
+            <node oor:name="c10" oor:op="replace">
+                <prop oor:name="URL" oor:type="xs:string">
+                    <value>service:com.github.jferard.AccessibilityHelper4LO?run_calc</value>
+                </prop>
+                <prop oor:name="Title" oor:type="xs:string">
+                    <value xml:lang="en">Run AccessibilityHelper4LO</value>
+                    <value xml:lang="fr">Démarrer AccessibilityHelper4LO</value>
+                </prop>
+                <prop oor:name="Context" oor:type="xs:string">
+                    <value>com.sun.star.sheet.SpreadsheetDocument</value>
+                </prop>
+            </node>
+            <node oor:name="w10" oor:op="replace">
+                <prop oor:name="URL" oor:type="xs:string">
+                    <value>service:com.github.jferard.AccessibilityHelper4LO?run_writer</value>
+                </prop>
+                <prop oor:name="Title" oor:type="xs:string">
+                    <value xml:lang="en">Run AccessibilityHelper4LO</value>
+                    <value xml:lang="fr">Démarrer AccessibilityHelper4LO</value>
+                </prop>
+                <prop oor:name="Context" oor:type="xs:string">
+                    <value>com.sun.star.text.TextDocument</value>
+                </prop>
+            </node>
+        </node>
+    </node>
+</oor:component-data>

@@ -1,0 +1,10 @@
+.pytest_cache
+.idea
+temp
+venv
+
+.coverage
+*.pyc
+*.oxt
+src/pythonpath/py4lo_*.py
+src/pythonpath/mock_constants.py

@@ -1,0 +1,9 @@
+AccessibilityHelper4LO est une extension LibreOffice qui facilite l'accès
+aux éléments d'un document.
+
+Copyright (C) J. Férard 2023
+
+Licence: GNU GPL v3.
+
+
+
