@@ -12,6 +12,7 @@ class DocumentNodeFactory:
     """
     A factory to build the document tree
     """
+
     def __init__(self, ah4lo_lang: AH4LOLang, oDoc: UnoSpreadsheet):
         self.ah4lo_lang = ah4lo_lang
         self.oDoc = oDoc
@@ -112,37 +113,79 @@ class SheetNodeFactory:
 
     def get_dialogs(self) -> Optional[NodeBuilder]:
         oForms = self.oSheet.DrawPage.Forms
-        if oForms.Count == 0:
-            return None
 
         nodes = []
         for i in range(oForms.Count):
             oForm = oForms.getByIndex(i)
             for j in range(oForm.Count):
-                oControl = oForm.getByIndex(j)
-                text = "{} {}".format(oControl.ServiceName, oControl.Name)
-                oControlView = self.oController.getControl(oControl)
-
-                def action(logger=self._logger, oControlView=oControlView):
-                    logger.debug(
-                        "Focus %s", repr(oControl.Name))
-                    oControlView.setFocus()
-
+                oControlModel = oForm.getByIndex(j)
+                name = self._extract_name(oControlModel.ServiceName)
+                # CheckBox
+                # ComboBox
+                # CommandButton
+                # CurrencyField
+                # DatabaseCheckBox
+                # DatabaseComboBox
+                # DatabaseCurrencyField
+                # DatabaseDateField
+                # DatabaseFormattedField
+                # DatabaseImageControl
+                # DatabaseListBox
+                # DatabaseNumericField
+                # DatabasePatternField
+                # DatabaseRadioButton
+                # DatabaseTextField
+                # DatabaseTimeField
+                # DataForm
+                # DateField
+                # FileControl
+                # FixedText
+                # Form
+                # FormattedField
+                # GridControl
+                # GroupBox
+                # HiddenControl
+                # HTMLForm
+                # ImageButton
+                # ListBox
+                # NavigationToolBar
+                # NumericField
+                # PatternField
+                # RadioButton
+                # RichTextControl
+                # ScrollBar
+                # SpinButton
+                # SubmitButton
+                # TextField
+                # TimeField
+                text = "{}, {}".format(name, oControlModel.Label)
+                def action(oController=self.oController,
+                           oSheet=self.oSheet, oControlModel=oControlModel):
+                    oController.ActiveSheet = oSheet
+                    try:
+                        oControl = self.oController.getControl(oControlModel)
+                    except Exception:
+                        self._logger.exception("control %s",
+                                               oControlModel.Name)
+                    else:
+                        oControl.setFocus()
                 node = NodeBuilder(text, action)
                 nodes.append(node)
 
-        dialogs_node = NodeBuilder(self.dialogs(nodes))
+        if not nodes:
+            return None
+
+        dialogs_node = NodeBuilder(self.ah4lo_lang.dialogs(len(nodes)))
         dialogs_node.extend_children(nodes)
 
         return dialogs_node
 
-    def dialogs(self, nodes):
-        return "Dialogues {}".format(len(nodes))
+    def _extract_name(self, service_name: str) -> str:
+        parts = service_name.rsplit(".")
+        return parts[-1]
 
     def get_annotations(self) -> Optional[NodeBuilder]:
         oAnnotations = self.oSheet.Annotations
-        if oAnnotations.Count == 0:
-            return None
 
         ranges_by_annotation = {}
         for i in range(oAnnotations.Count):
@@ -159,8 +202,11 @@ class SheetNodeFactory:
 
             oRanges.addRangeAddress(oCell.RangeAddress, True)
 
+        if not ranges_by_annotation:
+            return None
+
         annotations_node = NodeBuilder(
-            "ommentaires {}".format(len(ranges_by_annotation)))
+            self.ah4lo_lang.annotations(len(ranges_by_annotation)))
         for annotation, oRanges in ranges_by_annotation.items():
             node = NodeBuilder(
                 "'{}' : {}".format(annotation, oRanges.RangeAddressesAsString))
@@ -169,8 +215,6 @@ class SheetNodeFactory:
 
     def get_charts(self) -> Optional[NodeBuilder]:
         oCharts = self.oSheet.Charts
-        if oCharts.Count == 0:
-            return None
 
         nodes = []
         for oChart in to_iter(oCharts):
@@ -178,19 +222,19 @@ class SheetNodeFactory:
             if oTitle:
                 string = oTitle.String
             else:
-                string = "diagramme sans nom"
+                string = self.ah4lo_lang.anonymous_chart_word
             chart_node = NodeBuilder(string)
             nodes.append(chart_node)
 
-        charts_node = NodeBuilder("Diagrammes {}".format(len(nodes)))
+        if not nodes:
+            return None
+
+        charts_node = NodeBuilder(self.ah4lo_lang.charts(len(nodes)))
         charts_node.extend_children(nodes)
         return charts_node
 
     def get_data_pilot_tables(self) -> Optional[NodeBuilder]:
         oDataPilotTables = self.oSheet.DataPilotTables
-        if oDataPilotTables.Count == 0:
-            return None
-
         nodes = []
         for oDataPilotTable in to_iter(oDataPilotTables):
             range_address = oDataPilotTable.SourceRange
@@ -205,7 +249,10 @@ class SheetNodeFactory:
             data_pilot_table_node = NodeBuilder(string)
             nodes.append(data_pilot_table_node)
 
+        if not nodes:
+            return None
+
         data_pilot_tables_node = NodeBuilder(
-            "Tables dynamiques {}".format(len(nodes)))
+            self.ah4lo_lang.dynamic_tables(len(nodes)))
         data_pilot_tables_node.extend_children(nodes)
         return data_pilot_tables_node

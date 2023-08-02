@@ -11,7 +11,7 @@ class AH4LO:
     def run_calc(self):
         lo_dialogs = AH4LODialogs(lo_helper.get_lang())
         oDialogControl = lo_dialogs.create_calc_control(self._oDoc)
-        oDialogControl.execute()
+        oDialogControl.setVisible(True)  # execute()
 
     def run_writer(self):
         message_box(

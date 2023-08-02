@@ -5,6 +5,13 @@ def _with_s(name: str, count: int) -> str:
         return "{} {}".format(count, name)
 
 
+def _plural(name: str, names: str, count: int) -> str:
+    if count > 1:
+        return "{} {}s".format(count, names)
+    else:
+        return "{} {}".format(count, name)
+
+
 class AH4LOLang:
     document_word = "document"
     sheet_word = "sheet"
@@ -14,6 +21,11 @@ class AH4LOLang:
     masked_word = "masked"
     protected_word = "protected"
     empty_word = "(Empty)"
+    dialog_word = "dialogs"
+    annotation_word = "annotation"
+    chart_word = "chart"
+    anonymous_chart_word = "anonymous chart"
+    dynamic_table_word = "dynamic table"
 
     @staticmethod
     def from_lang(lang: str) -> "AH4LOLang":
@@ -39,7 +51,7 @@ class AH4LOLang:
     def sheet_description(self, sheet_name: str, is_hidden: bool,
                           is_protected: bool) -> str:
         return self._sheet_description(
-            sheet_name, is_hidden, is_protected, self.sheet_word)
+            sheet_name, is_hidden, is_protected)
 
     def _sheet_description(self, sheet_name: str, is_hidden: bool,
                            is_protected: bool) -> str:
@@ -57,6 +69,18 @@ class AH4LOLang:
 
     def columns(self, count: int) -> str:
         return _with_s(self.column_word, count).capitalize()
+
+    def dialogs(self, count: int) -> str:
+        return _with_s(self.dialog_word, count).capitalize()
+
+    def annotations(self, count: int) -> str:
+        return _with_s(self.annotation_word, count).capitalize()
+
+    def charts(self, count: int) -> str:
+        return _with_s(self.chart_word, count).capitalize()
+
+    def dynamic_tables(self, count: int) -> str:
+        return _with_s(self.dynamic_table_word, count).capitalize()
 
     def get_type_name(self, data_type: int) -> str:
         return {
@@ -91,6 +115,17 @@ class AH4LOLangFr(AH4LOLang):
     empty_word = "(Vide)"
     masked_word = "masquée"
     protected_word = "protégée"
+    dialog_word = "dialogue"
+    annotation_word = "commentaire"
+    chart_word = "diagramme"
+    anonymous_chart_word = "diagramme anonyme"
+    dynamic_table_word = "table dynamique"
+    dynamic_tables_word = "tables dynamique"
+
+    def dynamic_tables(self, count: int) -> str:
+        return _plural(
+            self.dynamic_table_word, self.dynamic_tables_word, count
+        ).capitalize()
 
     def get_type_name(self, data_type: int) -> str:
         return {

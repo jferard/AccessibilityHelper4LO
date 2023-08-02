@@ -5,7 +5,8 @@ from typing import List, Optional, cast, Callable, Iterable
 class Node:
     _logger = logging.getLogger()
 
-    def __init__(self, value: str, action: Optional[Callable[[], None]],
+    def __init__(self, value: str,
+                 action: Optional[Callable[[], None]],
                  children: List["Node"], parent: Optional["Node"], level: int,
                  previous_sibling: Optional["Node"],
                  next_sibling: Optional["Node"]):
@@ -20,7 +21,11 @@ class Node:
     def execute(self):
         if self.action is not None:
             self._logger.debug("Execute action")
-            self.action()
+            try:
+                self.action()
+            except Exception:
+                self._logger.exception("Action")
+            self._logger.debug("Action executed")
 
     def previous(self) -> Optional["Node"]:
         n = self.previous_sibling

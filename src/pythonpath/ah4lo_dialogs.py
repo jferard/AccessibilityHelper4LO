@@ -48,6 +48,10 @@ class ItemKeyListener(unohelper.Base, XKeyListener):
                 state.left()
             elif e.KeyCode == ENTER_KEY:
                 state.enter()
+            elif e.KeyCode == 1281:
+                self.oDialogControl.setVisible(False)
+                self.oDialogControl.dispose()
+                return
 
             self.helper.place_lines(self.oDialogControl)
         except Exception:
@@ -55,6 +59,8 @@ class ItemKeyListener(unohelper.Base, XKeyListener):
 
 
 class ScrollTreeHelper:
+    _logger = logging.getLogger(__name__)
+
     def __init__(self, root: Node, line_count: int, width: int, height: int,
                  prefix: str = "scroll_tree"):
         self.tree = Tree(root)
@@ -90,6 +96,9 @@ class ScrollTreeHelper:
 
     def place_lines(self, oDialogControl: UnoControl):
         controls = list(self._get_controls(oDialogControl))
+        if len(controls) == 0:
+            self._logger.warning("No lines available!")
+            return
 
         base_index = len(controls) // 2
 
