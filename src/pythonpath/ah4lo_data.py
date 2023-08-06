@@ -3,12 +3,12 @@ from typing import Optional, cast
 
 from ah4lo_lang import AH4LOLang
 from ah4lo_tree import Node, NodeBuilder
-from lo_helper import guess_format_id, get_type_id
+from lo_helper import guess_format_id, get_type_id, extract_values
 from py4lo_helper import get_used_range, to_iter
 from py4lo_typing import UnoSpreadsheet, UnoRange, UnoSheet
 
 
-class DocumentNodeFactory:
+class CalcDocumentNodeFactory:
     """
     A factory to build the document tree
     """
@@ -159,6 +159,7 @@ class SheetNodeFactory:
                 # TextField
                 # TimeField
                 text = "{}, {}".format(name, oControlModel.Label)
+
                 def action(oController=self.oController,
                            oSheet=self.oSheet, oControlModel=oControlModel):
                     oController.ActiveSheet = oSheet
@@ -169,6 +170,7 @@ class SheetNodeFactory:
                                                oControlModel.Name)
                     else:
                         oControl.setFocus()
+
                 node = NodeBuilder(text, action)
                 nodes.append(node)
 
@@ -256,3 +258,76 @@ class SheetNodeFactory:
             self.ah4lo_lang.dynamic_tables(len(nodes)))
         data_pilot_tables_node.extend_children(nodes)
         return data_pilot_tables_node
+
+
+class WriterDocumentNodeFactory:
+    _logger = logging.getLogger(__name__)
+
+    def __init__(self, ah4lo_lang: AH4LOLang, oDoc: UnoSpreadsheet):
+        self.ah4lo_lang = ah4lo_lang
+        self.oDoc = oDoc
+
+    def get_root(self) -> NodeBuilder:
+        oProperties = self.oDoc.DocumentProperties
+        root_node = NodeBuilder(oProperties.Title)
+        for name, value in [
+            ("author", oProperties.Author),
+            ("subject", oProperties.Subject),
+            ("description", oProperties.Description)
+        ]:
+            node = NodeBuilder("{}: {}".format(name, value))
+            root_node.append_child(node)
+
+        oStatistics = oProperties.DocumentStatistics
+        page_count, paragraph_count, word_count = extract_values(
+            oStatistics, ("PageCount", "ParagraphCount", "WordCount")
+        )
+        node = NodeBuilder("{} pages, {} paragraphs, {} words".format(
+            page_count, paragraph_count, word_count
+        ))
+        root_node.append_child(node)
+
+        oCursor = self.oDoc.Text.createTextCursor()
+        nodes = [root_node]
+        oCursor.gotoStart(False)
+        oCursor.gotoEnd(True)
+        oEnum = oCursor.Text.createEnumeration()
+        while oEnum.hasMoreElements():
+            oElement = oEnum.nextElement()
+            oController = self.oDoc.CurrentController
+
+            def action(oController=oController, oElement=oElement):
+                # oController.Frame.ContainerWindow.toFront()
+                oController.ViewCursor.gotoRange(oElement.Anchor.Start, False)
+
+            if oElement.supportsService(
+                    "com.sun.star.text.TextTable"):
+                value = "table {} ({} columns × {} rows)".format(
+                    oElement.Name, oElement.Columns.Count,
+                    oElement.Rows.Count)
+                node = NodeBuilder(value, action)
+                nodes[-1].append_child(node)
+            elif oElement.supportsService(
+                    "com.sun.star.text.BaseFrame"):
+
+                value = "frame {} {}".format(
+                    oElement.Title,
+                    oElement.Description)
+                node = NodeBuilder(value, action)
+                nodes[-1].append_child(node)
+            else:
+                oRules = oElement.NumberingRules
+                if oRules and oRules.NumberingIsOutline:
+                    level = oElement.NumberingLevel + 1  # 1 for heading 1
+                    assert level >= 1, repr(oElement)
+                    value = "{}. {}".format(
+                        oElement.ListLabelString, oElement.String
+                    )
+                    node = NodeBuilder(value, action)
+                    if level < len(nodes):
+                        nodes = nodes[:level]
+                    nodes[-1].append_child(node)
+                    nodes.append(node)
+
+        root_node.freeze_as_root()
+        return root_node

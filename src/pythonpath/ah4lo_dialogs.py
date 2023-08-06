@@ -1,9 +1,10 @@
 import logging
 from typing import Iterator
 
-from ah4lo_data import DocumentNodeFactory
+from ah4lo_data import CalcDocumentNodeFactory, WriterDocumentNodeFactory
 from ah4lo_lang import AH4LOLang
 from ah4lo_tree import Node, Tree
+from lo_helper import extract_values
 from py4lo_dialogs import place_widget, Control, ControlModel
 from py4lo_helper import create_uno_service, unohelper
 from py4lo_typing import UnoControl, UnoControlModel, UnoSpreadsheet
@@ -142,10 +143,38 @@ class AH4LODialogs:
 
         oDialogModel = create_uno_service(ControlModel.Dialog)
         oDialogModel.Title = text
-        place_widget(oDialogModel, 100, 50, 500, 300)
+        place_widget(oDialogModel, 100, 50, 500, 225)
 
-        root = DocumentNodeFactory(self._ah4lo_lang, oDoc).get_root()
-        helper = ScrollTreeHelper(root, 15, 400, 15)
+        root = CalcDocumentNodeFactory(self._ah4lo_lang, oDoc).get_root()
+        helper = ScrollTreeHelper(root, 15, 500, 15)
+        helper.create_models(oDialogModel)
+
+        oDialogControl = create_uno_service(Control.Dialog)
+        oDialogControl.setModel(oDialogModel)
+
+        helper.add_keys(oDialogControl)
+        helper.place_lines(oDialogControl)
+
+        oDialogControl.setVisible(True)
+        toolkit = create_uno_service(
+            "com.sun.star.awt.Toolkit")
+        oDialogControl.createPeer(toolkit, None)
+        return oDialogControl
+
+    def create_writer_control(self, oDoc: UnoSpreadsheet):
+        doc_title = oDoc.Title
+        page_count = extract_values(
+            oDoc.DocumentProperties.DocumentStatistics,
+            ("PageCount",))[0]
+        text = self._ah4lo_lang.writer_window_title(
+            doc_title, page_count)
+
+        oDialogModel = create_uno_service(ControlModel.Dialog)
+        oDialogModel.Title = text
+        place_widget(oDialogModel, 100, 50, 500, 225)
+
+        root = WriterDocumentNodeFactory(self._ah4lo_lang, oDoc).get_root()
+        helper = ScrollTreeHelper(root, 15, 500, 15)
         helper.create_models(oDialogModel)
 
         oDialogControl = create_uno_service(Control.Dialog)

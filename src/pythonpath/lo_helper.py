@@ -1,4 +1,5 @@
 import collections
+from typing import List, Any, Iterable
 
 try:
     # noinspection PyUnresolvedReferences
@@ -80,3 +81,10 @@ def get_type_id(oFormats, format_id: int) -> NumberFormat:
 class FakeProvider:
     def __init__(self, component_ctx):
         self.service_manager = component_ctx.getServiceManager()
+        self.ctxt = component_ctx
+        self.parent_win = None
+
+
+def extract_values(pvs: List, names: Iterable[str]) -> List[Any]:
+    value_by_name = {pv.Name: pv.Value for pv in pvs}
+    return [value_by_name.get(name, 1) for name in names]

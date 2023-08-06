@@ -27,6 +27,8 @@ class AH4LOLang:
     anonymous_chart_word = "anonymous chart"
     dynamic_table_word = "dynamic table"
 
+    page_word = "page"
+
     @staticmethod
     def from_lang(lang: str) -> "AH4LOLang":
         if lang == "fr":
@@ -35,9 +37,9 @@ class AH4LOLang:
             return AH4LOLangEn()
 
     def calc_window_title(self, doc_title: str, sheet_count: int) -> str:
-        return "{} {}, {}".format(self.document_word.capitalize(),
-                                  doc_title,
-                                  _with_s(self.sheet_word, sheet_count))
+        return "{} Calc {}, {}".format(
+            self.document_word.capitalize(), doc_title,
+            _with_s(self.sheet_word, sheet_count))
 
     def sheets(self, count: int) -> str:
         return _with_s(self.sheet_word, count)
@@ -101,6 +103,11 @@ class AH4LOLang:
             8196: "Duration",
         }.get(data_type, "All")
 
+    def writer_window_title(self, doc_title: str, page_count: int):
+        return "{} Writer {}, {}".format(self.document_word.capitalize(),
+                                         doc_title,
+                                         _with_s(self.page_word, page_count))
+
 
 class AH4LOLangEn(AH4LOLang):
     pass
@@ -121,6 +128,8 @@ class AH4LOLangFr(AH4LOLang):
     anonymous_chart_word = "diagramme anonyme"
     dynamic_table_word = "table dynamique"
     dynamic_tables_word = "tables dynamique"
+
+    page_word = "page"
 
     def dynamic_tables(self, count: int) -> str:
         return _plural(
