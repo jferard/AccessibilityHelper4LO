@@ -28,6 +28,11 @@ class AH4LOLang:
     dynamic_table_word = "dynamic table"
 
     page_word = "page"
+    table_word = "table"
+    frame_word = "frame"
+    author_word = "author"
+    subject_word = "subject"
+    description_word = "description"
 
     @staticmethod
     def from_lang(lang: str) -> "AH4LOLang":
@@ -108,6 +113,34 @@ class AH4LOLang:
                                          doc_title,
                                          _with_s(self.page_word, page_count))
 
+    def writer_table(self, table_name: str, columns_count: int,
+                     rows_count: int) -> str:
+        value = "{} {} ({} × {})".format(
+            self.table_word.capitalize(),
+            table_name, _with_s(self.column_word, columns_count),
+            _with_s(self.row_word, rows_count))
+        return value
+
+    def writer_frame(self, title: str, description: str) -> str:
+        value = "{} {} {}".format(
+            self.frame_word, title, description)
+        return value
+
+    def writer_title(self, label: str, title: str):
+        return "{}. {}".format(
+            label.strip(), title
+        )
+
+    def writer_author(self, author: str) -> str:
+        return "{}: {}".format(self.author_word.capitalize(), author)
+
+    def writer_subject(self, subject: str) -> str:
+        return "{}: {}".format(self.subject_word.capitalize(), subject)
+
+    def writer_description(self, description: str) -> str:
+        return "{}: {}".format(
+            self.description_word.capitalize(), description)
+
 
 class AH4LOLangEn(AH4LOLang):
     pass
@@ -130,6 +163,11 @@ class AH4LOLangFr(AH4LOLang):
     dynamic_tables_word = "tables dynamique"
 
     page_word = "page"
+    table_word = "table"
+    frame_word = "cadre"
+    author_word = "auteur"
+    subject_word = "sujet"
+    description_word = "description"
 
     def dynamic_tables(self, count: int) -> str:
         return _plural(

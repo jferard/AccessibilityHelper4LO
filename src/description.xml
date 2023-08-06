@@ -5,7 +5,7 @@
         xmlns:xlink="http://www.w3.org/1999/xlink">
     <identifier value=""/>
 
-    <version value="0.0.2"/>
+    <version value="0.0.3"/>
 
     <extension-description>
         <src xlink:href="description/description.en" lang="en"/>

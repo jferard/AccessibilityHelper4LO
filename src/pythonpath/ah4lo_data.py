@@ -7,6 +7,10 @@ from lo_helper import guess_format_id, get_type_id, extract_values
 from py4lo_helper import get_used_range, to_iter
 from py4lo_typing import UnoSpreadsheet, UnoRange, UnoSheet
 
+BASE_FRAME_SERVICE_NAME = "com.sun.star.text.BaseFrame"
+
+TEXT_TABLE_SERVICE_NAME = "com.sun.star.text.TextTable"
+
 
 class CalcDocumentNodeFactory:
     """
@@ -266,16 +270,25 @@ class WriterDocumentNodeFactory:
     def __init__(self, ah4lo_lang: AH4LOLang, oDoc: UnoSpreadsheet):
         self.ah4lo_lang = ah4lo_lang
         self.oDoc = oDoc
+        self.oParagraphStyles = self.oDoc.StyleFamilies.ParagraphStyles
+        self.oNumberingStyles = self.oDoc.StyleFamilies.NumberingStyles
 
     def get_root(self) -> NodeBuilder:
         oProperties = self.oDoc.DocumentProperties
         root_node = NodeBuilder(oProperties.Title)
-        for name, value in [
-            ("author", oProperties.Author),
-            ("subject", oProperties.Subject),
-            ("description", oProperties.Description)
-        ]:
-            node = NodeBuilder("{}: {}".format(name, value))
+        if oProperties.Author.strip():
+            value = self.ah4lo_lang.writer_author(oProperties.Author)
+            node = NodeBuilder(value)
+            root_node.append_child(node)
+
+        if oProperties.Subject.strip():
+            value = self.ah4lo_lang.writer_subject(oProperties.Subject)
+            node = NodeBuilder(value)
+            root_node.append_child(node)
+
+        if oProperties.Description.strip():
+            value = self.ah4lo_lang.writer_description(oProperties.Description)
+            node = NodeBuilder(value)
             root_node.append_child(node)
 
         oStatistics = oProperties.DocumentStatistics
@@ -297,37 +310,48 @@ class WriterDocumentNodeFactory:
             oController = self.oDoc.CurrentController
 
             def action(oController=oController, oElement=oElement):
-                # oController.Frame.ContainerWindow.toFront()
                 oController.ViewCursor.gotoRange(oElement.Anchor.Start, False)
 
-            if oElement.supportsService(
-                    "com.sun.star.text.TextTable"):
-                value = "table {} ({} columns × {} rows)".format(
-                    oElement.Name, oElement.Columns.Count,
-                    oElement.Rows.Count)
+            if oElement.supportsService(TEXT_TABLE_SERVICE_NAME):
+                table_name = oElement.Name
+                columns_count = oElement.Columns.Count
+                rows_count = oElement.Rows.Count
+                value = self.ah4lo_lang.writer_table(table_name, columns_count,
+                                                     rows_count)
                 node = NodeBuilder(value, action)
                 nodes[-1].append_child(node)
-            elif oElement.supportsService(
-                    "com.sun.star.text.BaseFrame"):
-
-                value = "frame {} {}".format(
-                    oElement.Title,
-                    oElement.Description)
+            elif oElement.supportsService(BASE_FRAME_SERVICE_NAME):
+                value = self.ah4lo_lang.writer_frame(
+                    oElement.Title, oElement.Description)
                 node = NodeBuilder(value, action)
                 nodes[-1].append_child(node)
             else:
-                oRules = oElement.NumberingRules
-                if oRules and oRules.NumberingIsOutline:
-                    level = oElement.NumberingLevel + 1  # 1 for heading 1
-                    assert level >= 1, repr(oElement)
-                    value = "{}. {}".format(
-                        oElement.ListLabelString, oElement.String
-                    )
+                outline_level = self._get_outline_level(oElement)
+                if outline_level > 0:
+                    value = self.ah4lo_lang.writer_title(
+                        oElement.ListLabelString, oElement.String)
                     node = NodeBuilder(value, action)
-                    if level < len(nodes):
-                        nodes = nodes[:level]
+                    if outline_level < len(nodes):
+                        nodes = nodes[:outline_level]
                     nodes[-1].append_child(node)
                     nodes.append(node)
 
         root_node.freeze_as_root()
         return root_node
+
+    def _get_outline_level(self, oElement) -> int:
+        oStyle = self.oParagraphStyles.getByName(oElement.ParaStyleName)
+        while True:
+            if oStyle.NumberingStyleName == "":
+                return -1
+            oNumberingStyle = self.oNumberingStyles.getByName(
+                oStyle.NumberingStyleName)
+            oRules = oNumberingStyle.NumberingRules
+
+            if oRules and oRules.NumberingIsOutline:
+                return oElement.NumberingLevel + 1  # 1 for heading 1
+            if oStyle.ParentStyle == "":
+                return -1
+
+            oStyle = self.oParagraphStyles.getByName(
+                oStyle.ParentStyle)
