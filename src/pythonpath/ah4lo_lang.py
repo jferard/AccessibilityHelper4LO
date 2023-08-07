@@ -27,7 +27,10 @@ class AH4LOLang:
     anonymous_chart_word = "anonymous chart"
     dynamic_table_word = "dynamic table"
 
+    information_word = "information"
+    statistics_word = "statistics"
     page_word = "page"
+    content_word = "content"
     table_word = "table"
     frame_word = "frame"
     author_word = "author"
@@ -141,6 +144,19 @@ class AH4LOLang:
         return "{}: {}".format(
             self.description_word.capitalize(), description)
 
+    def informations(self) -> str:
+        return self.information_word.capitalize() + "s"
+
+    def statistics(self, page_count: int, paragraph_count: int,
+                   word_count: int):
+        return "{} {} pages, {} paragraphs, {} words".format(
+            self.statistics_word.capitalize(),
+            page_count, paragraph_count, word_count
+        )
+
+    def content(self) -> str:
+        return self.content_word.capitalize()
+
 
 class AH4LOLangEn(AH4LOLang):
     pass
@@ -162,7 +178,10 @@ class AH4LOLangFr(AH4LOLang):
     dynamic_table_word = "table dynamique"
     dynamic_tables_word = "tables dynamique"
 
+    information_word = "information"
+    statistics_word = "statistiques"
     page_word = "page"
+    content_word = "contenu"
     table_word = "table"
     frame_word = "cadre"
     author_word = "auteur"

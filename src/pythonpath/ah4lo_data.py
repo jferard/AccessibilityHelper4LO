@@ -1,5 +1,5 @@
 import logging
-from typing import Optional, cast
+from typing import Optional, cast, List
 
 from ah4lo_lang import AH4LOLang
 from ah4lo_tree import Node, NodeBuilder
@@ -10,6 +10,8 @@ from py4lo_typing import UnoSpreadsheet, UnoRange, UnoSheet
 BASE_FRAME_SERVICE_NAME = "com.sun.star.text.BaseFrame"
 
 TEXT_TABLE_SERVICE_NAME = "com.sun.star.text.TextTable"
+
+PARAGRAPH_SERVICE_NAME = "com.sun.star.text.Paragraph"
 
 
 class CalcDocumentNodeFactory:
@@ -273,71 +275,148 @@ class WriterDocumentNodeFactory:
         self.oParagraphStyles = self.oDoc.StyleFamilies.ParagraphStyles
         self.oNumberingStyles = self.oDoc.StyleFamilies.NumberingStyles
 
-    def get_root(self) -> NodeBuilder:
+    def get_root(self) -> Node:
         oProperties = self.oDoc.DocumentProperties
         root_node = NodeBuilder(oProperties.Title)
-        if oProperties.Author.strip():
-            value = self.ah4lo_lang.writer_author(oProperties.Author)
-            node = NodeBuilder(value)
-            root_node.append_child(node)
+        information_node = self._get_informations()
+        root_node.append_child(information_node)
+        content_node = self._get_content()
+        root_node.append_child(content_node)
+        root_node.freeze_as_root()
+        return root_node
 
-        if oProperties.Subject.strip():
-            value = self.ah4lo_lang.writer_subject(oProperties.Subject)
-            node = NodeBuilder(value)
-            root_node.append_child(node)
-
-        if oProperties.Description.strip():
-            value = self.ah4lo_lang.writer_description(oProperties.Description)
-            node = NodeBuilder(value)
-            root_node.append_child(node)
-
-        oStatistics = oProperties.DocumentStatistics
-        page_count, paragraph_count, word_count = extract_values(
-            oStatistics, ("PageCount", "ParagraphCount", "WordCount")
-        )
-        node = NodeBuilder("{} pages, {} paragraphs, {} words".format(
-            page_count, paragraph_count, word_count
-        ))
-        root_node.append_child(node)
-
+    def _get_content(self) -> NodeBuilder:
+        content_node = NodeBuilder(self.ah4lo_lang.content())
         oCursor = self.oDoc.Text.createTextCursor()
-        nodes = [root_node]
+        nodes = [content_node]
         oCursor.gotoStart(False)
         oCursor.gotoEnd(True)
-        oEnum = oCursor.Text.createEnumeration()
-        while oEnum.hasMoreElements():
-            oElement = oEnum.nextElement()
+
+        oGraphicObjects = self.oDoc.GraphicObjects
+        self._logger.debug("%s", repr(oGraphicObjects))
+        graphic_objects_by_paragraph = {
+            oGo.Anchor.TextParagraph: oGo for oGo in to_iter(oGraphicObjects)
+        }
+
+        oTextFrames = self.oDoc.TextFrames
+        self._logger.debug("%s", repr(oTextFrames))
+        text_frames_by_paragraph = {
+            oTf.Anchor.TextParagraph: oTf for oTf in to_iter(oTextFrames)
+        }
+
+        cur_nodes = []
+        for oElement in to_iter(oCursor.Text):
             oController = self.oDoc.CurrentController
+
+            if not oElement.supportsService(PARAGRAPH_SERVICE_NAME):
+                self._logger.debug("Other %s",
+                                   repr(oElement))
 
             def action(oController=oController, oElement=oElement):
                 oController.ViewCursor.gotoRange(oElement.Anchor.Start, False)
 
             if oElement.supportsService(TEXT_TABLE_SERVICE_NAME):
+                self._logger.debug("Table %s", repr(oElement))
                 table_name = oElement.Name
                 columns_count = oElement.Columns.Count
                 rows_count = oElement.Rows.Count
                 value = self.ah4lo_lang.writer_table(table_name, columns_count,
                                                      rows_count)
-                node = NodeBuilder(value, action)
-                nodes[-1].append_child(node)
-            elif oElement.supportsService(BASE_FRAME_SERVICE_NAME):
-                value = self.ah4lo_lang.writer_frame(
-                    oElement.Title, oElement.Description)
-                node = NodeBuilder(value, action)
-                nodes[-1].append_child(node)
+                table_node = NodeBuilder(value, action)
+                cur_nodes.append(table_node)
             else:
                 outline_level = self._get_outline_level(oElement)
                 if outline_level > 0:
+                    self._flush_nodes(nodes[-1], cur_nodes)
+
                     value = self.ah4lo_lang.writer_title(
                         oElement.ListLabelString, oElement.String)
-                    node = NodeBuilder(value, action)
+                    title_node = NodeBuilder(value, action)
                     if outline_level < len(nodes):
                         nodes = nodes[:outline_level]
-                    nodes[-1].append_child(node)
-                    nodes.append(node)
+                    nodes[-1].append_child(title_node)
+                    nodes.append(title_node)
+                else:
+                    par_node = NodeBuilder(
+                        "Paragraph {}".format(oElement.String[:50]), action)
+                    cur_nodes.append(par_node)
 
-        root_node.freeze_as_root()
-        return root_node
+                try:
+                    oGo = graphic_objects_by_paragraph[oElement.TextParagraph]
+                except KeyError:
+                    pass
+                else:
+                    self._logger.debug("Graphic Object %s", repr(oGo))
+                    go_node = NodeBuilder("Graphic Object {}".format(oGo.Name),
+                                          action)
+                    cur_nodes.append(go_node)
+
+                try:
+                    oTf = text_frames_by_paragraph[oElement.TextParagraph]
+                except KeyError:
+                    pass
+                else:
+                    self._logger.debug("TextFrame %s", repr(oTf))
+                    tf_node = NodeBuilder("Text Frame {}".format(oTf.Name),
+                                          action)
+                    for oTfElement in to_iter(oTf):
+                        # TODO: look for titles
+                        try:
+                            oGo = graphic_objects_by_paragraph[
+                                oTfElement.TextParagraph]
+                        except KeyError:
+                            pass
+                        else:
+                            go_node = NodeBuilder(
+                                "Graphic Object {}".format(oGo.Name), action)
+                            tf_node.append_child(go_node)
+
+                    cur_nodes.append(tf_node)
+
+        self._flush_nodes(nodes[-1], cur_nodes)
+        return content_node
+
+    def _flush_nodes(self, parent_node: NodeBuilder,
+                     cur_nodes: List[NodeBuilder]):
+        step = 10
+        self._flush_nodes_aux(parent_node, cur_nodes, step)
+        cur_nodes.clear()
+
+    def _flush_nodes_aux(self, parent_node, cur_nodes, step):
+        for i in range(0, len(cur_nodes), step):
+            nodes = cur_nodes[i: i + step]
+            pars_node = NodeBuilder(
+                "Paragraphs {} to {}".format(i + 1, i + len(nodes)))
+            for node in nodes:
+                pars_node.append_child(node)
+
+            parent_node.append_child(pars_node)
+
+    def _get_informations(self) -> NodeBuilder:
+        oProperties = self.oDoc.DocumentProperties
+        information_node = NodeBuilder(self.ah4lo_lang.informations())
+        if oProperties.Author.strip():
+            value = self.ah4lo_lang.writer_author(oProperties.Author)
+            author_node = NodeBuilder(value)
+            information_node.append_child(author_node)
+        if oProperties.Subject.strip():
+            value = self.ah4lo_lang.writer_subject(oProperties.Subject)
+            subject_node = NodeBuilder(value)
+            information_node.append_child(subject_node)
+        if oProperties.Description.strip():
+            value = self.ah4lo_lang.writer_description(oProperties.Description)
+            description_node = NodeBuilder(value)
+            information_node.append_child(description_node)
+
+        oStatistics = oProperties.DocumentStatistics
+        page_count, paragraph_count, word_count = extract_values(
+            oStatistics, ("PageCount", "ParagraphCount", "WordCount")
+        )
+        statistics_node = NodeBuilder(
+            self.ah4lo_lang.statistics(
+                page_count, paragraph_count, word_count))
+        information_node.append_child(statistics_node)
+        return information_node
 
     def _get_outline_level(self, oElement) -> int:
         oStyle = self.oParagraphStyles.getByName(oElement.ParaStyleName)
