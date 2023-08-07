@@ -13,6 +13,8 @@ def _plural(name: str, names: str, count: int) -> str:
 
 
 class AH4LOLang:
+    to_word = "to"
+
     document_word = "document"
     sheet_word = "sheet"
     column_word = "column"
@@ -29,13 +31,18 @@ class AH4LOLang:
 
     information_word = "information"
     statistics_word = "statistics"
-    page_word = "page"
-    content_word = "content"
-    table_word = "table"
-    frame_word = "frame"
     author_word = "author"
     subject_word = "subject"
     description_word = "description"
+    page_word = "page"
+
+    content_word = "content"
+    paragraph_word = "paragraph"
+    word_word = "word"
+    table_word = "table"
+    frame_word = "frame"
+    graphic_object_word = "graphic object"
+    text_frame_word = "text_frame"
 
     @staticmethod
     def from_lang(lang: str) -> "AH4LOLang":
@@ -149,13 +156,34 @@ class AH4LOLang:
 
     def statistics(self, page_count: int, paragraph_count: int,
                    word_count: int):
-        return "{} {} pages, {} paragraphs, {} words".format(
+        return "{}: {}, {}, {} words".format(
             self.statistics_word.capitalize(),
-            page_count, paragraph_count, word_count
+            _with_s(self.page_word, page_count),
+            _with_s(self.paragraph_word, paragraph_count), word_count
         )
 
     def content(self) -> str:
         return self.content_word.capitalize()
+
+    def paragraph(self, par_text: str) -> str:
+        return "{}: {}".format(self.paragraph_word.capitalize(), par_text)
+
+    def paragraphs(self, from_index: str, to_index: str):
+        if from_index == to_index:
+            return "{} {}".format(
+                self.paragraph_word.capitalize(), from_index)
+        else:
+            return "{} {} {} {}".format(
+                self.paragraph_word.capitalize() + "s",
+                from_index, self.to_word, to_index)
+
+    def graphic_object(self, go_name: str) -> str:
+        return "{}: {}".format(
+            self.graphic_object_word.capitalize(), go_name)
+
+    def text_frame(self, tf_name: str) -> str:
+        return "{}: {}".format(
+            self.text_frame_word.capitalize(), tf_name)
 
 
 class AH4LOLangEn(AH4LOLang):
@@ -163,6 +191,8 @@ class AH4LOLangEn(AH4LOLang):
 
 
 class AH4LOLangFr(AH4LOLang):
+    to_word = "à"
+
     document_word = "document"
     sheet_word = "feuille"
     column_word = "colonne"
@@ -180,13 +210,18 @@ class AH4LOLangFr(AH4LOLang):
 
     information_word = "information"
     statistics_word = "statistiques"
+    subject_word = "sujet"
+    author_word = "auteur"
+    description_word = "description"
     page_word = "page"
+    paragraph_word = "paragraphe"
+    word_word = "mot"
+
     content_word = "contenu"
     table_word = "table"
     frame_word = "cadre"
-    author_word = "auteur"
-    subject_word = "sujet"
-    description_word = "description"
+    graphic_object_word = "object graphique"
+    text_frame_word = "cadre de texte"
 
     def dynamic_tables(self, count: int) -> str:
         return _plural(

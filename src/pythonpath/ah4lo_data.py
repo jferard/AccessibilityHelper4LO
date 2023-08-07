@@ -337,8 +337,10 @@ class WriterDocumentNodeFactory:
                     nodes[-1].append_child(title_node)
                     nodes.append(title_node)
                 else:
+                    par_text = oElement.String[:50] + "..."
                     par_node = NodeBuilder(
-                        "Paragraph {}".format(oElement.String[:50]), action)
+                        self.ah4lo_lang.paragraph(par_text),
+                        action)
                     cur_nodes.append(par_node)
 
                 try:
@@ -346,9 +348,8 @@ class WriterDocumentNodeFactory:
                 except KeyError:
                     pass
                 else:
-                    self._logger.debug("Graphic Object %s", repr(oGo))
-                    go_node = NodeBuilder("Graphic Object {}".format(oGo.Name),
-                                          action)
+                    go_node = NodeBuilder(
+                        self.ah4lo_lang.graphic_object(oGo.Name), action)
                     cur_nodes.append(go_node)
 
                 try:
@@ -356,11 +357,10 @@ class WriterDocumentNodeFactory:
                 except KeyError:
                     pass
                 else:
-                    self._logger.debug("TextFrame %s", repr(oTf))
-                    tf_node = NodeBuilder("Text Frame {}".format(oTf.Name),
-                                          action)
+                    tf_node = NodeBuilder(
+                        self.ah4lo_lang.text_frame(oTf.Name), action)
                     for oTfElement in to_iter(oTf):
-                        # TODO: look for titles
+                        # TODO: look for titles, paragraphs
                         try:
                             oGo = graphic_objects_by_paragraph[
                                 oTfElement.TextParagraph]
@@ -368,7 +368,8 @@ class WriterDocumentNodeFactory:
                             pass
                         else:
                             go_node = NodeBuilder(
-                                "Graphic Object {}".format(oGo.Name), action)
+                                self.ah4lo_lang.graphic_object(oGo.Name),
+                                action)
                             tf_node.append_child(go_node)
 
                     cur_nodes.append(tf_node)
@@ -386,7 +387,7 @@ class WriterDocumentNodeFactory:
         for i in range(0, len(cur_nodes), step):
             nodes = cur_nodes[i: i + step]
             pars_node = NodeBuilder(
-                "Paragraphs {} to {}".format(i + 1, i + len(nodes)))
+                self.ah4lo_lang.paragraphs(i + 1, i + len(nodes)))
             for node in nodes:
                 pars_node.append_child(node)
 
