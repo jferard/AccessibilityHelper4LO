@@ -158,3 +158,29 @@ class Tree:
         if node.children:
             value += " " + s
         return value
+
+    def home(self):
+        sibling = self.focus.previous_sibling
+        while sibling:
+            self.focus = sibling
+            sibling = self.focus.previous_sibling
+
+    def end(self):
+        sibling = self.focus.next_sibling
+        while sibling:
+            self.focus = sibling
+            sibling = self.focus.next_sibling
+
+    def page_up(self):
+        for i in range(10):
+            sibling = self.focus.previous_sibling
+            if not sibling:
+                return
+            self.focus = sibling
+
+    def page_down(self):
+        for i in range(10):
+            sibling = self.focus.next_sibling
+            if not sibling:
+                return
+            self.focus = sibling

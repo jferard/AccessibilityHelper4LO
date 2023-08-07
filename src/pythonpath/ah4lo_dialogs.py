@@ -21,7 +21,14 @@ DOWN_KEY = 0x400
 UP_KEY = 0x401
 RIGHT_KEY = 0x402
 LEFT_KEY = 0x403
+
+HOME_KEY = 0x404
+END_KEY = 0x405
+PAGEUP_KEY = 0x406
+PAGEDOWN_KEY = 0x407
+
 ENTER_KEY = 0x500
+ESC_KEY = 0x501
 
 
 class ItemKeyListener(unohelper.Base, XKeyListener):
@@ -49,7 +56,17 @@ class ItemKeyListener(unohelper.Base, XKeyListener):
                 state.left()
             elif e.KeyCode == ENTER_KEY:
                 state.enter()
-            elif e.KeyCode == 1281:
+            elif e.KeyCode == UP_KEY:
+                state.up()
+            elif e.KeyCode == HOME_KEY:
+                state.home()
+            elif e.KeyCode == END_KEY:
+                state.end()
+            elif e.KeyCode == PAGEUP_KEY:
+                state.page_up()
+            elif e.KeyCode == PAGEDOWN_KEY:
+                state.page_down()
+            elif e.KeyCode == ESC_KEY:
                 self.oDialogControl.setVisible(False)
                 self.oDialogControl.dispose()
                 return
