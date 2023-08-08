@@ -1,26 +1,17 @@
 import logging
-from typing import Optional, cast
+from typing import Optional, cast, Dict, List, NewType
 
 from ah4lo_lang import AH4LOLang
-from ah4lo_tree import Node, NodeBuilder
+from ah4lo_tree import Node, NodeBuilder, Action
 from lo_helper import guess_format_id, get_type_id, extract_values
 from py4lo_helper import get_used_range, to_iter
-from py4lo_typing import UnoSpreadsheet, UnoRange, UnoSheet
+from py4lo_typing import (UnoSpreadsheet, UnoRange, UnoSheet, UnoService,
+                          UnoController)
 
-# services
-TEXT_GRAPHIC_OBJECT_SERVICE_NAME = "com.sun.star.text.TextGraphicObject"
 
-SHAPE_SERVICE_NAME = "com.sun.star.drawing.Shape"
-
-TEXT_FRAME_SERVICE_NAME = "com.sun.star.text.TextFrame"
-
-TEXT_EMBEDDED_OBJECT_SERVICE_NAME = "com.sun.star.text.TextEmbeddedObject"
-
-BASE_FRAME_SERVICE_NAME = "com.sun.star.text.BaseFrame"
-
-TEXT_TABLE_SERVICE_NAME = "com.sun.star.text.TextTable"
-
-PARAGRAPH_SERVICE_NAME = "com.sun.star.text.Paragraph"
+##############################
+# CALC
+##############################
 
 
 class CalcDocumentNodeFactory:
@@ -275,6 +266,74 @@ class SheetNodeFactory:
         return data_pilot_tables_node
 
 
+##############################
+# WRITER
+##############################
+# services
+TEXT_GRAPHIC_OBJECT_SERVICE_NAME = "com.sun.star.text.TextGraphicObject"
+
+SHAPE_SERVICE_NAME = "com.sun.star.drawing.Shape"
+
+TEXT_FRAME_SERVICE_NAME = "com.sun.star.text.TextFrame"
+
+TEXT_EMBEDDED_OBJECT_SERVICE_NAME = "com.sun.star.text.TextEmbeddedObject"
+
+BASE_FRAME_SERVICE_NAME = "com.sun.star.text.BaseFrame"
+
+TEXT_TABLE_SERVICE_NAME = "com.sun.star.text.TextTable"
+
+PARAGRAPH_SERVICE_NAME = "com.sun.star.text.Paragraph"
+
+# Types
+Paragraph = NewType("Paragraph", UnoService)
+XShape = NewType("XShape", UnoService)
+TextRange = NewType("TextRange", UnoService)
+
+
+class DrawingNodeFactory:
+    _logger = logging.getLogger(__name__)
+
+    def __init__(self, ah4lo_lang: AH4LOLang, oDoc: UnoSpreadsheet,
+                 drawings_by_paragraph: Dict[Paragraph, List[XShape]]):
+        self.ah4lo_lang = ah4lo_lang
+        self.oDoc = oDoc
+        self.drawings_by_paragraph = drawings_by_paragraph
+
+    def find_drawings(self, oParagraph: Paragraph) -> List[XShape]:
+        return self.drawings_by_paragraph.get(oParagraph, [])
+
+    def create_drawing_node(self, oDrawing: XShape, action: Optional[Action]
+                            ) -> NodeBuilder:
+        if oDrawing.supportsService(
+                TEXT_EMBEDDED_OBJECT_SERVICE_NAME):
+            self._logger.warning("TODO: Embedded object %s",
+                                 repr(oDrawing.Component))
+            value = self.ah4lo_lang.embedded_object(oDrawing.Name)
+            return NodeBuilder(value, action)
+        elif oDrawing.supportsService(TEXT_FRAME_SERVICE_NAME):
+            value = self.ah4lo_lang.text_frame(oDrawing.Name)
+            tf_node = NodeBuilder(
+                value, action)
+            WriterRangeContentBuilder(
+                self.ah4lo_lang, self.oDoc, oDrawing, tf_node,
+                self
+            ).build()
+            return tf_node
+        elif oDrawing.supportsService(
+                TEXT_GRAPHIC_OBJECT_SERVICE_NAME):
+            value = self.ah4lo_lang.graphic_object(
+                oDrawing.Name)
+            return NodeBuilder(value, action)
+        elif oDrawing.supportsService(SHAPE_SERVICE_NAME):
+            value = self.ah4lo_lang.shape(oDrawing.Name)
+            return NodeBuilder(value, action)
+        else:
+            self._logger.warning(
+                "Unkown drawing: %s", repr(oDrawing))
+            value = self.ah4lo_lang.unknown_drawing(oDrawing.Name)
+            return NodeBuilder(value, action)
+
+
 class WriterDocumentNodeFactory:
     _logger = logging.getLogger(__name__)
 
@@ -286,15 +345,32 @@ class WriterDocumentNodeFactory:
 
     def get_root(self) -> Node:
         oProperties = self.oDoc.DocumentProperties
+        drawings_by_paragraph = {}
+        for oDrawPage in to_iter(self.oDoc.DrawPages):
+            for oDrawing in to_iter(oDrawPage):
+                oAnchor = oDrawing.Anchor
+                if oAnchor is not None:
+                    drawings_by_paragraph.setdefault(
+                        oAnchor.TextParagraph, []).append(oDrawing)
+        drawing_node_factory = DrawingNodeFactory(
+            self.ah4lo_lang, self.oDoc, drawings_by_paragraph)
+
         root_node = NodeBuilder(oProperties.Title)
-        information_node = self._get_informations()
+
+        information_node = self._create_informations_node()
         root_node.append_child(information_node)
-        content_node = self._get_content()
+
+        content_node = self._create_content_node(drawing_node_factory)
         root_node.append_child(content_node)
+
+        orphans_node = self._create_orphans_node(drawing_node_factory)
+        if orphans_node:
+            root_node.append_child(orphans_node)
+
         root_node.freeze_as_root()
         return root_node
 
-    def _get_informations(self) -> NodeBuilder:
+    def _create_informations_node(self) -> NodeBuilder:
         oProperties = self.oDoc.DocumentProperties
         information_node = NodeBuilder(self.ah4lo_lang.informations())
         if oProperties.Author.strip():
@@ -320,41 +396,51 @@ class WriterDocumentNodeFactory:
         information_node.append_child(statistics_node)
         return information_node
 
-    def _get_content(self) -> NodeBuilder:
+    def _create_content_node(
+            self, drawing_node_factory: DrawingNodeFactory
+    ) -> NodeBuilder:
         oCursor = self.oDoc.Text.createTextCursor()
         oCursor.gotoStart(False)
         oCursor.gotoEnd(True)
+
         content_node = NodeBuilder(self.ah4lo_lang.content())
         return WriterRangeContentBuilder(
-            self.ah4lo_lang, self.oDoc, oCursor, content_node).build()
+            self.ah4lo_lang, self.oDoc, oCursor, content_node,
+            drawing_node_factory).build()
+
+    def _create_orphans_node(self, drawing_node_factory: DrawingNodeFactory
+                             ) -> Optional[NodeBuilder]:
+        orphans = []
+        for oDrawPage in to_iter(self.oDoc.DrawPages):
+            for oDrawing in to_iter(oDrawPage):
+                oAnchor = oDrawing.Anchor
+                if oAnchor is None:
+                    orphans.append(oDrawing)
+        if orphans:
+            orphans_node = NodeBuilder("Orphan drawings")
+            for orphan in orphans:
+                orphan_node = drawing_node_factory.create_drawing_node(orphan,
+                                                                       None)
+                orphans_node.append_child(orphan_node)
+        else:
+            orphans_node = None
+        return orphans_node
 
 
 class WriterRangeContentBuilder:
     _logger = logging.getLogger(__name__)
 
-    def __init__(self, ah4lo_lang: AH4LOLang, oDoc, oTextRange, content_node):
+    def __init__(self, ah4lo_lang: AH4LOLang, oDoc: UnoSpreadsheet,
+                 oTextRange: TextRange, content_node: NodeBuilder,
+                 drawing_node_factory: "DrawingNodeFactory"):
         self.ah4lo_lang = ah4lo_lang
         self.oDoc = oDoc
         self.oTextRange = oTextRange
+        self.content_node = content_node
+        self.drawing_node_factory = drawing_node_factory
+
         self.oParagraphStyles = self.oDoc.StyleFamilies.ParagraphStyles
         self.oNumberingStyles = self.oDoc.StyleFamilies.NumberingStyles
-        self.drawings_by_paragraph = {}
-        for oDrawPage in to_iter(self.oDoc.DrawPages):
-            for oDrawing in to_iter(oDrawPage):
-                self.drawings_by_paragraph.setdefault(
-                    oDrawing.Anchor.TextParagraph, []).append(oDrawing)
-
-        oGraphicObjects = self.oDoc.GraphicObjects
-        self.graphic_objects_by_paragraph = {
-            oGo.Anchor.TextParagraph: oGo
-            for oGo in to_iter(oGraphicObjects)
-        }
-
-        oTextFrames = self.oDoc.TextFrames
-        self.text_frames_by_paragraph = {
-            oTf.Anchor.TextParagraph: oTf for oTf in to_iter(oTextFrames)
-        }
-        self.content_node = content_node
         self.cur_nodes = []
         self.nodes_stack = [content_node]
 
@@ -363,7 +449,8 @@ class WriterRangeContentBuilder:
         for oElement in to_iter(cursor_text):
             oController = self.oDoc.CurrentController
 
-            def action(oController=oController, oElement=oElement):
+            def action(oController: UnoController = oController,
+                       oElement=oElement):
                 oController.ViewCursor.gotoRange(oElement.Anchor.Start, False)
 
             if oElement.supportsService(TEXT_TABLE_SERVICE_NAME):
@@ -394,36 +481,12 @@ class WriterRangeContentBuilder:
                         action)
                     self.cur_nodes.append(par_node)
 
-                for oDrawing in self.drawings_by_paragraph.get(
-                        oElement.TextParagraph, []):
-                    if oDrawing.supportsService(
-                            TEXT_EMBEDDED_OBJECT_SERVICE_NAME):
-                        self._logger.debug("TODO: Embedded object %s",
-                                           repr(oDrawing.Component))
-                        value = self.ah4lo_lang.embedded_object(oDrawing.Name)
-                        eo_node = NodeBuilder(value, action)
-                        self.cur_nodes.append(eo_node)
-                    elif oDrawing.supportsService(TEXT_FRAME_SERVICE_NAME):
-                        value = self.ah4lo_lang.text_frame(oDrawing.Name)
-                        tf_node = NodeBuilder(
-                            value, action)
-                        WriterRangeContentBuilder(
-                            self.ah4lo_lang, self.oDoc, oDrawing, tf_node
-                        ).build()
-                        self.cur_nodes.append(tf_node)
-                    elif oDrawing.supportsService(
-                            TEXT_GRAPHIC_OBJECT_SERVICE_NAME):
-                        value = self.ah4lo_lang.graphic_object(
-                            oDrawing.Name)
-                        go_node = NodeBuilder(value, action)
-                        self.cur_nodes.append(go_node)
-                    elif oDrawing.supportsService(SHAPE_SERVICE_NAME):
-                        value = self.ah4lo_lang.shape(oDrawing.Name)
-                        shape_node = NodeBuilder(value, action)
-                        self.cur_nodes.append(shape_node)
-                    else:
-                        self._logger.warning(
-                            "Unkown drawing: %s", repr(oDrawing))
+                dnf = self.drawing_node_factory
+                for oDrawing in dnf.find_drawings(
+                        oElement.TextParagraph):
+                    drawing_node = dnf.create_drawing_node(
+                        oDrawing, action)
+                    self.cur_nodes.append(drawing_node)
 
         self._flush_nodes()
         return self.content_node

@@ -63,9 +63,12 @@ class Node:
             Node._short_repr(self.next_sibling))
 
 
+Action = Callable[[], None]
+
+
 class NodeBuilder:
     def __init__(self, value: str,
-                 action: Optional[Callable[[], None]] = None):
+                 action: Optional[Action] = None):
         self.value = value
         self.action = action
         self.children = cast(List[NodeBuilder], [])

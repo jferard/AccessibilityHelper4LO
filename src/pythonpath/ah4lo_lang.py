@@ -45,6 +45,7 @@ class AH4LOLang:
     text_frame_word = "text frame"
     shape_word = "shape"
     embedded_object_word = "embedded object"
+    unknown_drawing_word = "unknown drawing"
 
     @staticmethod
     def from_lang(lang: str) -> "AH4LOLang":
@@ -195,6 +196,10 @@ class AH4LOLang:
         return "{}: {}".format(
             self.embedded_object_word.capitalize(), eo_name)
 
+    def unknown_drawing(self, name: str):
+        return "{}: {}".format(
+            self.unknown_drawing_word.capitalize(), name)
+
 
 class AH4LOLangEn(AH4LOLang):
     pass
@@ -234,6 +239,7 @@ class AH4LOLangFr(AH4LOLang):
     text_frame_word = "cadre de texte"
     shape_word = "forme"
     embedded_object_word = "objet embarqué"
+    unknown_drawing_word = "dessin inconnu"
 
     def dynamic_tables(self, count: int) -> str:
         return _plural(
