@@ -42,7 +42,9 @@ class AH4LOLang:
     table_word = "table"
     frame_word = "frame"
     graphic_object_word = "graphic object"
-    text_frame_word = "text_frame"
+    text_frame_word = "text frame"
+    shape_word = "shape"
+    embedded_object_word = "embedded object"
 
     @staticmethod
     def from_lang(lang: str) -> "AH4LOLang":
@@ -168,7 +170,7 @@ class AH4LOLang:
     def paragraph(self, par_text: str) -> str:
         return "{}: {}".format(self.paragraph_word.capitalize(), par_text)
 
-    def paragraphs(self, from_index: str, to_index: str):
+    def paragraphs(self, from_index: int, to_index: int) -> str:
         if from_index == to_index:
             return "{} {}".format(
                 self.paragraph_word.capitalize(), from_index)
@@ -184,6 +186,14 @@ class AH4LOLang:
     def text_frame(self, tf_name: str) -> str:
         return "{}: {}".format(
             self.text_frame_word.capitalize(), tf_name)
+
+    def shape(self, shape_name: str) -> str:
+        return "{}: {}".format(
+            self.shape_word.capitalize(), shape_name)
+
+    def embedded_object(self, eo_name: str) -> str:
+        return "{}: {}".format(
+            self.embedded_object_word.capitalize(), eo_name)
 
 
 class AH4LOLangEn(AH4LOLang):
@@ -222,6 +232,8 @@ class AH4LOLangFr(AH4LOLang):
     frame_word = "cadre"
     graphic_object_word = "object graphique"
     text_frame_word = "cadre de texte"
+    shape_word = "forme"
+    embedded_object_word = "objet embarqué"
 
     def dynamic_tables(self, count: int) -> str:
         return _plural(
